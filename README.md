@@ -7,6 +7,7 @@ Most talks use Presenterm.
 
 - `cosmos-postgres-migration-plan/`: Disposable One-Time Code.
 - `exposed/`: Warum mich `JPA`/`Hibernate` nervt und warum `Exposed` angenehmer ist.
+- `otel-business-events/`: OpenTelemetry, Metriken und Business Events.
 
 ## Working Pattern
 
