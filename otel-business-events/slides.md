@@ -427,8 +427,8 @@ Bei aktivem Trace landet es zusätzlich als Span Event am aktuellen Span.
 Es besteht aus Name, Kategorie, Version,
 gemeinsamem Kontext und event-spezifischen Attributen.
 
-Aus vielen Business Events können Reports und Dashboards entstehen.
-Das einzelne Event bleibt aber ein Einzelfall.
+Aus vielen Business Events können Reports, Alarme (in der DVAG sogar mit Kritikalität) und Dashboards entstehen.
+Das einzelne Event bleibt aber ein Einzelfall. 
 
 <!-- reset_layout -->
 <!-- column_layout: [1, 2, 2, 1] -->
@@ -829,6 +829,7 @@ Aus einer Metrik entsteht kein Einzelfall zurück.
 <!-- new_lines: 3 -->
 ### Für Fachbereich und Partner
 
+- Alerting in Checkly
 - Fachbereichsreports
 - Partner-Dashboards
 - Feature-Nutzung
