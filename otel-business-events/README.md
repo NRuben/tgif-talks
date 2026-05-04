@@ -17,3 +17,12 @@ mit klarer Abgrenzung zwischen Logs, Traces, Metriken und Business Events.
 
 Business Events sind keine Metriken.
 Sie sind fachliche Fakten, aus denen Metriken, Reports und Dashboards abgeleitet werden können.
+
+
+# Sources
+
+- https://dvag.github.io/posts/distributed-tracing/
+- https://github.com/dvag/otel-business-events
+- https://opentelemetry.io/docs/concepts/
+- https://opentelemetry.io
+- https://www.dash0.com/knowledge/logs-metrics-and-traces-observability
