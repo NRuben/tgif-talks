@@ -57,6 +57,97 @@ Was mich an `JPA`/`Hibernate` nervt
 
 <!-- end_slide -->
 
+`val` ist keine Garantie
+========================
+
+<!-- new_lines: 3 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+```kotlin
+@Entity
+class Person(val name: String)
+// Hibernate setzt name via Reflection
+// val ≠ immutable hier
+```
+
+<!-- column: 2 -->
+
+- `val` kompiliert zu `final` in Java
+- JPA-Spec verlangt non-final Felder
+- Hibernate umgeht das via Reflection
+- Kotlins Immutabilitätsgarantie gilt hier nicht
+
+<!-- end_slide -->
+
+Null Safety ist eine Illusion
+==============================
+
+<!-- new_lines: 3 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+```kotlin
+@Entity
+class User(var name: String) // non-nullable
+
+// DB enthält NULL
+// → Hibernate setzt name = null
+// Compiler schweigt
+```
+
+<!-- column: 2 -->
+
+- `String` im Code, `null` zur Laufzeit
+- Reflection umgeht Kotlins Null-Checks
+- Constraint-Drift zwischen DB und Code reicht
+- kein Warning, keine Chance
+
+<!-- end_slide -->
+
+`data class` und `JPA` passen nicht zusammen
+============================================
+
+<!-- new_lines: 3 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+### `data class` als Entity
+
+- final → kein Proxy-Subclassing möglich
+- kein No-Arg-Constructor
+- `equals`/`hashCode` über alle Felder
+- inkompatibel mit JPA-Spec
+
+<!-- column: 2 -->
+
+### Default-Werte werden ignoriert
+
+- JPA ruft No-Arg-Constructor auf
+- dann Reflection für alle Felder
+- dein Constructor läuft beim Laden nicht
+- Default-Werte haben keinen Effekt
+
+<!-- end_slide -->
+
+Und das ist noch nicht alles
+=============================
+
+<!-- incremental_lists: true -->
+<!-- new_lines: 2 -->
+<!-- column_layout: [1, 2] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+- `plugin.spring` + `plugin.jpa` + `allOpen` nötig — damit JPA mit Kotlin überhaupt compiliert
+- Bis Kotlin 2.2: Annotations landeten am falschen Target — stille Mapping-Fehler
+- JEP 500 plant, `final` wirklich final zu machen — `val`-Entities könnten brechen
+
+<!-- end_slide -->
+
 Die eigentliche Beschwerde
 =========================
 
@@ -196,6 +287,7 @@ Orders
 - stark bei komplexen Queries
 - stark bei Bulk-Operationen
 - `R2DBC`-fähig
+- Domain-Typen gehören euch
 
 <!-- column: 2 -->
 
@@ -205,12 +297,17 @@ Orders
 - angenehm bei simplem CRUD
 - bei komplexen Queries awkward
 - kein `R2DBC`
+- explizit, aber kein Hibernate-Klon
 
 <!-- reset_layout -->
 <!-- new_lines: 2 -->
 
 Faustregel:  
 `Wenn ihr unsicher seid, startet mit DSL.`
+
+<!-- new_lines: 1 -->
+
+Im `DSL`-Modus keine managed Entities — eure Domain-Typen sind eure Sache.
 
 <!-- end_slide -->
 
@@ -230,37 +327,133 @@ Warum `DSL` meistens gewinnt
 
 <!-- end_slide -->
 
-Case Study: echte Migration
-===========================
+Exposed in Produktion
+=====================
 
 <!-- new_lines: 3 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
 
-Hier kommt später euer umgestelltes Projekt rein.
+### `tarifrechner`
+
+- Exposed `DAO`
+- ein Entity, ein Zustand
+- Optimistic Locking über Versionsspalte
+- [TarifrechnerState.kt](https://github.com/dvag/tarifrechner-referenzimplementierung-backend/blob/develop/backend/src/main/kotlin/com/dvag/vp/digital/tarifrechner/referenzimplementierung/backend/persistence/TarifrechnerState.kt)
+
+<!-- column: 2 -->
+
+### `vorlagenverwaltung`
+
+- Exposed `DSL`
+- pure Queries, explizites Mapping
+- Domain-Typen als `data class`
+- [TemplateRepository.kt](https://github.com/dvag/vp-digital-tarifierung-formular-template-service/blob/main/src/main/kotlin/com/dvag/vpdigital/vorlagenverwaltung/persistence/template/TemplateRepository.kt)
+
+<!-- end_slide -->
+
+Tabellenstruktur ohne `@Entity`
+================================
 
 <!-- new_lines: 2 -->
 <!-- column_layout: [1, 2, 2, 1] -->
 <!-- font_size: 3 -->
 <!-- column: 1 -->
 
-### Zeigen
+```kotlin
+object TemplatesTable : Table("templates") {
+    val templateId = uuid("template_id")
+    val vbId       = text("vb_id")
+    val formId     = text("form_id")
+    val deleted    = bool("deleted")
+    val rowVersion = long("row_version")
 
-- Ausgangslage im alten Stack
-- welche Query- und Mapping-Muster wehgetan haben
-- warum der Wechsel überhaupt diskutiert wurde
+    override val primaryKey =
+        PrimaryKey(templateId)
+}
+```
 
 <!-- column: 2 -->
 
-### Belegen
-
-- was nach der Migration sofort anders war
-- wo `Exposed` konkret angenehmer wurde
-- wo der Wechsel auch echte Kosten hatte
+- Schema als `object`, kein managed Entity
+- Felder sind Kotlin-Properties
+- kein `@Entity`, kein `@Column`
+- Domain-Typ ist separat — eine `data class`
 
 <!-- reset_layout -->
-<!-- new_lines: 2 -->
+<!-- new_lines: 1 -->
 
-Merksatz:  
-`Der Talk wird glaubwürdig, sobald nicht nur Theorie, sondern echte Reibung sichtbar wird.`
+[TemplatesTable.kt](https://github.com/dvag/vp-digital-tarifierung-formular-template-service/blob/main/src/main/kotlin/com/dvag/vpdigital/vorlagenverwaltung/persistence/template/TemplatesTable.kt)
+
+<!-- end_slide -->
+
+Dynamische Filter ohne Criteria API
+=====================================
+
+<!-- new_lines: 2 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+```kotlin
+var where = (vbId eq vbId) and
+            (deleted eq false)
+formId?.let {
+    where = where and (formId eq it)
+}
+TemplatesTable
+    .selectAll()
+    .where(where)
+    .orderBy(createdAt to SortOrder.ASC)
+    .map(::toTemplateDto)
+```
+
+<!-- column: 2 -->
+
+- `whereClause` ist ein normaler Ausdruck
+- optionale Filter: einfaches `?.let`
+- kein `CriteriaBuilder`, kein Predicate-Baukasten
+- die Query ist lesbar bevor sie läuft
+
+<!-- reset_layout -->
+<!-- new_lines: 1 -->
+
+[TemplateRepository.kt](https://github.com/dvag/vp-digital-tarifierung-formular-template-service/blob/main/src/main/kotlin/com/dvag/vpdigital/vorlagenverwaltung/persistence/template/TemplateRepository.kt)
+
+<!-- end_slide -->
+
+Optimistic Locking — sichtbar in der Query
+==========================================
+
+<!-- new_lines: 2 -->
+<!-- column_layout: [1, 2, 2, 1] -->
+<!-- font_size: 3 -->
+<!-- column: 1 -->
+
+```kotlin
+TemplatesTable.updateReturning(
+    where = {
+        (templateId eq id) and
+        (rowVersion eq expectedVersion)
+    }
+) {
+    it[name] = template.name
+    it[rowVersion] = expectedVersion + 1
+}.singleOrNull()
+```
+
+<!-- column: 2 -->
+
+- Version-Check ist Teil der `WHERE`-Clause
+- kein `@Version`, kein Dirty-Check im Hintergrund
+- kein Ergebnis → Konflikt, Fehler explizit
+- alles sichtbar, alles im Code
+
+<!-- reset_layout -->
+<!-- new_lines: 1 -->
+
+[TemplateRepository.kt](https://github.com/dvag/vp-digital-tarifierung-formular-template-service/blob/main/src/main/kotlin/com/dvag/vpdigital/vorlagenverwaltung/persistence/template/TemplateRepository.kt)
 
 <!-- end_slide -->
 

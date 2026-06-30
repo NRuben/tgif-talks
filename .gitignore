@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# JetBrains IDEs
+.idea/
+
+# Exported slide artifacts
+export/
+*.pdf
+*.png
